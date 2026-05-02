@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS • UPLOAD v2.1</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+    :root {
+      --neon-cyan: #00f5ff;
+      --neon-purple: #9d4eff;
+      --neon-pink: #ff2a6d;
+      --neon-green: #00ff9d;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: radial-gradient(circle at center, #0a0a1f 0%, #000000 100%);
+      color: white;
+      min-height: 100vh;
+      /* FIX: allow scrolling */
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    /* Background Grid & Particles */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 245, 255, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 245, 255, 0.07) 1px, transparent 1px);
+      background-size: 50px 50px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* Page wrapper for centering + scroll */
+    .page-wrapper {
+      position: relative;
+      z-index: 10;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px 60px;
+    }
+
+    .uploader {
+      width: 540px;
+      max-width: 100%;
+      background: rgba(10, 18, 38, 0.88);
+      border-radius: 24px;
+      padding: 44px 50px;
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(0, 245, 255, 0.28);
+      box-shadow:
+        0 0 70px -10px rgba(0, 245, 255, 0.45),
+        0 0 25px -5px rgba(157, 78, 255, 0.35);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .uploader::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg,
+          rgba(0, 245, 255, 0.07) 0%,
+          rgba(157, 78, 255, 0.07) 100%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .header h1 {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 3rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #00f5ff, #9d4eff, #ff2a6d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 6px;
+    }
+
+    .header p {
+      font-family: 'Share Tech Mono', monospace;
+      color: #5588cc;
+      font-size: 0.75rem;
+      margin-top: 8px;
+      letter-spacing: 2px;
+    }
+
+    /* ── Drop Zone ── */
+    #dropZone {
+      border: 2px dashed rgba(0, 245, 255, 0.5);
+      border-radius: 18px;
+      padding: 60px 30px;
+      text-align: center;
+      transition: all 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    #dropZone:hover {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 40px rgba(0, 245, 255, 0.4);
+      transform: translateY(-3px);
+    }
+
+    #dropZone.active {
+      border-color: #00ff9d;
+      background: rgba(0, 255, 157, 0.06);
+      box-shadow: 0 0 55px rgba(0, 255, 157, 0.5);
+    }
+
+    .drop-content {
+      pointer-events: none;
+    }
+
+    .icon-3d {
+      font-size: 5rem;
+      margin-bottom: 18px;
+      display: block;
+      filter: drop-shadow(0 0 25px var(--neon-cyan));
+    }
+
+    .upload-text {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: white;
+      letter-spacing: 2px;
+    }
+
+    .sub-text {
+      font-family: 'Share Tech Mono', monospace;
+      color: #5577aa;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+    }
+
+    /* Scanline */
+    .scanline {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom,
+          transparent 40%,
+          rgba(0, 245, 255, 0.12) 50%,
+          transparent 60%);
+      pointer-events: none;
+      animation: scan 4s linear infinite;
+      opacity: 0.3;
+    }
+
+    @keyframes scan {
+      0% {
+        transform: translateY(-100%);
+      }
+
+      100% {
+        transform: translateY(400%);
+      }
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    /* ── Circular Upload Loader ── */
+    #uploadingState {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 0 10px;
+    }
+
+    .orbit-ring {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      margin-bottom: 28px;
+    }
+
+    /* Outer spinning ring */
+    .orbit-ring::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      border-top-color: var(--neon-cyan);
+      border-right-color: var(--neon-purple);
+      animation: spin 1s linear infinite;
+      box-shadow: 0 0 18px rgba(0, 245, 255, 0.5);
+    }
+
+    /* Inner spinning ring (opposite) */
+    .orbit-ring::after {
+      content: '';
+      position: absolute;
+      inset: 12px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      border-bottom-color: var(--neon-pink);
+      border-left-color: var(--neon-cyan);
+      animation: spin 0.65s linear infinite reverse;
+      box-shadow: inset 0 0 12px rgba(255, 42, 109, 0.3);
+    }
+
+    .orbit-percent {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.4rem;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 12px var(--neon-cyan);
+      line-height: 1;
+    }
+
+    .orbit-percent small {
+      font-size: 0.55rem;
+      color: #5588aa;
+      letter-spacing: 1px;
+      margin-top: 3px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .upload-status-text {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--neon-cyan);
+      letter-spacing: 3px;
+      animation: blink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    /* ── Success State ── */
+    #successState {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      padding-top: 10px;
+    }
+
+    .success-badge {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 3px;
+      color: var(--neon-green);
+      text-shadow: 0 0 14px var(--neon-green);
+      animation: glowPulse 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes glowPulse {
+      from {
+        text-shadow: 0 0 8px var(--neon-green);
+      }
+
+      to {
+        text-shadow: 0 0 28px var(--neon-green);
+      }
+    }
+
+    #previewImg {
+      max-width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 245, 255, 0.3);
+      box-shadow: 0 0 30px rgba(0, 245, 255, 0.2);
+    }
+
+    .action-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 4px;
+    }
+
+    .btn {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 2px;
+      padding: 10px 22px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-view {
+      background: transparent;
+      border: 1px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    .btn-view:hover {
+      background: rgba(0, 245, 255, 0.12);
+      box-shadow: 0 0 18px rgba(0, 245, 255, 0.35);
+    }
+
+    .btn-upload {
+      background: rgba(0, 245, 255, 0.1);
+      border: 1px solid var(--neon-cyan);
+      color: white;
+    }
+
+    .btn-upload:hover {
+      background: rgba(0, 245, 255, 0.2);
+      box-shadow: 0 0 18px rgba(0, 245, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn-reload {
+      background: rgba(157, 78, 255, 0.1);
+      border: 1px solid var(--neon-purple);
+      color: var(--neon-purple);
+    }
+
+    .btn-reload:hover {
+      background: rgba(157, 78, 255, 0.2);
+      box-shadow: 0 0 18px rgba(157, 78, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    /* ── Error State ── */
+    #errorState {
+      display: none;
+      text-align: center;
+      padding: 20px 0 10px;
+    }
+
+    .error-msg {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--neon-pink);
+      letter-spacing: 2px;
+      text-shadow: 0 0 10px var(--neon-pink);
+      margin-bottom: 16px;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0, 245, 255, 0.3), transparent);
+      margin: 24px 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="bg-grid"></div>
+  <div id="canvas-container"></div>
+
+  <div class="page-wrapper">
+    <div class="uploader">
+      <div class="header">
+        <h1>NEXUS</h1>
+        <p>QUANTUM IMAGE TRANSMISSION v2.1</p>
+      </div>
+
+      <!-- Drop Zone (hidden during upload & after success) -->
+      <div id="dropZone">
+        <div class="scanline"></div>
+        <div class="drop-content">
+          <span class="icon-3d">🌌</span>
+          <div class="upload-text">DROP IMAGE INTO VOID</div>
+          <div class="sub-text">or click to browse &nbsp;•&nbsp; PNG, JPG, WEBP, GIF</div>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*">
+
+      <!-- Uploading State -->
+      <div id="uploadingState">
+        <div class="orbit-ring">
+          <div class="orbit-percent">
+            <span id="percentNum">0</span>
+            <small>%</small>
+          </div>
+        </div>
+        <div class="upload-status-text" id="uploadStatusText">TRANSMITTING...</div>
+      </div>
+
+      <!-- Success State -->
+      <div id="successState">
+        <div class="success-badge">✦ TRANSMISSION COMPLETE ✦</div>
+        <img id="previewImg" src="" alt="Uploaded image" />
+        <div class="action-row">
+          <a id="viewLink" href="#" target="_blank" class="btn btn-view">VIEW FULL →</a>
+          <button onclick="resetUpload()" class="btn btn-upload">⟳ UPLOAD ANOTHER</button>
+          <button onclick="location.reload()" class="btn btn-reload">↺ RELOAD PAGE</button>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div id="errorState">
+        <div class="divider"></div>
+        <div class="error-msg">❌ TRANSMISSION FAILED</div>
+        <button onclick="resetUpload()" class="btn btn-upload">↺ TRY AGAIN</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── Three.js ──
+    function initThree() {
+      const container = document.getElementById('canvas-container');
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 35;
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      const geometry = new THREE.BufferGeometry();
+      const vertices = [],
+        colors = [];
+      for (let i = 0; i < 900; i++) {
+        vertices.push(
+          (Math.random() - 0.5) * 130,
+          (Math.random() - 0.5) * 130,
+          (Math.random() - 0.5) * 130
+        );
+        const t = Math.random();
+        colors.push(t < 0.5 ? 0.1 : 0.6, t < 0.5 ? 0.85 : 0.3, t < 0.5 ? 1 : 1);
+      }
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      const particles = new THREE.Points(geometry, new THREE.PointsMaterial({
+        size: 0.32,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.65,
+        blending: THREE.AdditiveBlending
+      }));
+      scene.add(particles);
+
+      (function animate() {
+        requestAnimationFrame(animate);
+        particles.rotation.y += 0.0007;
+        particles.rotation.x += 0.0003;
+        renderer.render(scene, camera);
+      })();
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+
+    // ── GSAP intro ──
+    window.addEventListener('load', () => {
+      initThree();
+      gsap.from(".uploader", {
+        y: 70,
+        opacity: 0,
+        duration: 1.1,
+        ease: "power4.out"
+      });
+    });
+
+    // ── Elements ──
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadingState = document.getElementById('uploadingState');
+    const successState = document.getElementById('successState');
+    const errorState = document.getElementById('errorState');
+    const percentNum = document.getElementById('percentNum');
+    const uploadStatusText = document.getElementById('uploadStatusText');
+    const previewImg = document.getElementById('previewImg');
+    const viewLink = document.getElementById('viewLink');
+
+    // ── Drag & Drop ──
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('active');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('active');
+      if (e.dataTransfer.files.length) handleUpload(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) handleUpload(fileInput.files[0]);
+    });
+
+    // ── State helpers ──
+    function showDropZone() {
+      dropZone.style.display = '';
+    }
+
+    function hideDropZone() {
+      dropZone.style.display = 'none';
+    }
+
+    function showUploading() {
+      uploadingState.style.display = 'flex';
+    }
+
+    function hideUploading() {
+      uploadingState.style.display = 'none';
+    }
+
+    function showSuccess() {
+      successState.style.display = 'flex';
+    }
+
+    function hideSuccess() {
+      successState.style.display = 'none';
+    }
+
+    function showError() {
+      errorState.style.display = 'block';
+    }
+
+    function hideError() {
+      errorState.style.display = 'none';
+    }
+
+    function resetUpload() {
+      fileInput.value = '';
+      hideUploading();
+      hideSuccess();
+      hideError();
+      percentNum.textContent = '0';
+      showDropZone();
+    }
+
+    // ── Upload handler — uses only XHR, no duplicate logic ──
+    function handleUpload(file) {
+      hideSuccess();
+      hideError();
+      hideDropZone();
+
+      percentNum.textContent = '0';
+      uploadStatusText.textContent = 'TRANSMITTING...';
+      showUploading();
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          percentNum.textContent = pct;
+          if (pct === 100) uploadStatusText.textContent = 'PROCESSING...';
+        }
+      };
+
+      xhr.onload = () => {
+        hideUploading();
+
+        let data;
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch (_) {
+          showDropZone();
+          showError();
+          return;
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300 && data.url) {
+          previewImg.src = data.url;
+          viewLink.href = data.url;
+          showSuccess();
+          gsap.from('#successState', {
+            opacity: 0,
+            y: 20,
+            duration: 0.6,
+            ease: 'power3.out'
+          });
+        } else {
+          showDropZone();
+          showError();
+        }
+      };
+
+      xhr.onerror = () => {
+        hideUploading();
+        showDropZone();
+        showError();
+      };
+
+      xhr.open('POST', '/upload');
+      xhr.send(formData);
+    }
+  </script>
+</body>
+
+</html>

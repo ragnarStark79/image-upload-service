@@ -13,7 +13,7 @@ jobs:
       AWS_ACCESS_KEY_ID: dummy
       AWS_SECRET_ACCESS_KEY: dummy
       AWS_REGION: ap-south-1
-      S3_BUCKET_NAME: dummy-bucket
+      AWS_BUCKET_NAME: dummy-bucket
 
     steps:
       - name: Checkout code
@@ -31,9 +31,12 @@ jobs:
         run: |
           node app.js &
           SERVER_PID=$!
-          
+
           echo "Waiting for server..."
-          sleep 8
+          for i in {1..10}; do
+            curl -s http://localhost:3001 && break
+            sleep 2
+          done
 
           curl --fail http://localhost:3001
 

@@ -1,74 +1,76 @@
-# Image Upload Service with Load Balancer
+# Image Upload Service
 
-## 🚀 Features
+A Node.js + Express app for uploading images to AWS S3 with a browser UI and CI-friendly fallback behavior.
 
-* Upload images using API
-* Store files in AWS S3
-* Load balancing using NGINX
-* Multiple backend instances
-* Unique file naming with UUID
+## Features
 
----
+- Upload images through a drag-and-drop web interface
+- Store files in AWS S3
+- Unique file names using UUID
+- Image-only validation
+- In-memory upload handling with Multer
+- CI mode with mocked S3 uploads for automated checks
 
-## 🧱 Architecture
+## Project Structure
 
-Client → NGINX (port 85) → Node Servers (3001, 3002) → AWS S3
+- [app.js](app.js) — Express app entry point
+- [routes/upload.js](routes/upload.js) — `POST /upload` route
+- [services/s3.js](services/s3.js) — AWS S3 client / CI mock
+- [public/index.html](public/index.html) — frontend upload UI
+- [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — GitHub Actions workflow
 
----
-
-## ⚙️ Setup
+## Setup
 
 ### 1. Install dependencies
 
+```bash
 npm install
+```
 
-### 2. Add environment variables (.env)
+### 2. Configure environment variables
 
+Create a `.env` file:
+
+```env
 PORT=3001
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
 AWS_REGION=ap-south-1
-S3_BUCKET_NAME=your_bucket
+AWS_BUCKET_NAME=your_bucket_name
+```
 
----
+## Run Locally
 
-### 3. Run multiple instances
+Start the server:
 
-PORT=3001 node app.js
-PORT=3002 node app.js
+```bash
+node app.js
+```
 
----
+Open:
 
-### 4. Start NGINX
+```text
+http://localhost:3001
+```
 
-brew services start nginx
+## API
 
----
+### `POST /upload`
 
-## 📦 API
+Uploads a single image file using `multipart/form-data`.
 
-### POST /upload
+- Field name: `file`
+- Accepted types: `image/*`
+- Max size: `2 MB`
 
-* URL: [http://localhost:85/upload](http://localhost:85/upload)
-* Body: form-data → file
+#### Success response
 
-### Response
-
+```json
 {
-"url": "S3_FILE_URL",
-"servedBy": "3001"
+  "url": "https://your-bucket.s3.amazonaws.com/file-name.png",
+  "servedBy": "3001"
 }
-
----
-
-## 🔁 Load Balancing
-
-NGINX distributes requests using round-robin across:
-
-* localhost:3001
-* localhost:3002
-
----
+```
 
 ## 📈 Load Testing (Fast Forward Way)
 
@@ -78,20 +80,25 @@ This is the fast forward way to test load balancing through terminal. Make sure 
 for i in {1..10}; do curl -X POST http://localhost:8085/upload -F "file=@file_path"; echo ""; done
 ```
 
----
+#### Error responses
 
-## ⚙️ CI (GitHub Actions)
+- `400` — No file uploaded
+- `500` — Upload failed or invalid file
 
-* Runs on push & pull request
-* Installs dependencies
-* Starts server
-* Fails if server does not run
+## S3 Behavior
 
----
+The S3 client in [`services/s3.js`](services/s3.js) uses:
 
-## 📌 Notes
+- real AWS credentials when environment variables are present
+- a mocked upload response in CI when credentials are missing
 
-* No database used
-* No authentication
-* Focus on infrastructure and system design
-* Ensure AWS credentials are secure
+## CI
+
+GitHub Actions runs the server startup check in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) using dummy AWS values.
+
+## Notes
+
+- No database is used
+- No authentication is included
+- The app is designed for simple image upload workflows
+- Ensure AWS credentials are secure

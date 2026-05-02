@@ -1,7 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const s3 = require('../services/s3');
-const { v4: uuidv4 } = require('uuid');
+// const { v4: uuidv4 } = require('uuid');
+const uuidv4 = require('uuid').v4;
 
 const router = express.Router();
 
