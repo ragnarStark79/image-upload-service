@@ -1,0 +1,48 @@
+# Node dependencies
+node_modules/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage / test output
+coverage/
+.nyc_output/
+
+# Build outputs
+build/
+dist/
+.out/
+
+# Cache / temp
+.cache/
+.tmp/
+tmp/
+.eslintcache
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node optional caches
+*.tsbuildinfo
+
+# Local AWS credentials (never commit)
+.aws/
