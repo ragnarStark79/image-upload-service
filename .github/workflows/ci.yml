@@ -8,6 +8,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      PORT: 3001
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+      AWS_REGION: ap-south-1
+      S3_BUCKET_NAME: dummy-bucket
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -22,7 +29,7 @@ jobs:
 
       - name: Start server
         run: |
-          PORT=3001 node app.js &
+          node app.js &
           sleep 5
 
       - name: Test server running
