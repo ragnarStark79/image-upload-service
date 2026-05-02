@@ -9,6 +9,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.send('Server is running');
+});
 
 app.use((req, res, next) => {
   console.log(`Request handled by PORT: ${process.env.PORT}`);

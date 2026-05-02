@@ -27,10 +27,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Start server
+      - name: Start server and test
         run: |
           node app.js &
-          sleep 5
+          SERVER_PID=$!
+          
+          echo "Waiting for server..."
+          sleep 8
 
-      - name: Test server running
-        run: curl http://localhost:3001 || exit 1
+          curl --fail http://localhost:3001
+
+          kill $SERVER_PID
